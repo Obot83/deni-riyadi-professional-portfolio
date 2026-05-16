@@ -285,6 +285,8 @@ export default function App() {
   const [draftToRestore, setDraftToRestore] = React.useState<any>(null);
   const [projects, setProjects] = React.useState<any[]>([]);
   const [experience, setExperience] = React.useState<any[]>([]);
+  const [showUrlPromptId, setShowUrlPromptId] = React.useState<string | null>(null);
+  const [urlPromptValue, setUrlPromptValue] = React.useState("");
   
   // Sync editing project state
   React.useEffect(() => {
@@ -582,88 +584,66 @@ export default function App() {
   const [isUploading, setIsUploading] = React.useState(false);
   const [isUploadingCV, setIsUploadingCV] = React.useState(false);
 
-  const performUpload = React.useCallback(async (blob: Blob, target: {id: string, type: 'project' | 'experience'}) => {
+  const performUpload = async (blob: Blob, target: {id: string, type: 'project' | 'experience'}) => {
     setIsUploading(true);
     setUploadingForId(target.id);
     setUploadingType(target.type);
 
     try {
-      console.log(`🛰️ Starting ${target.type} upload to Firebase Storage...`);
+      console.log(`🛰️ Converting ${target.type} image to Base64...`);
       
-      // Create local URL for immediate optimistic UI update
-      const localUrl = URL.createObjectURL(blob);
-      
-      if (target.type === 'project') {
-        if (selectedProject && selectedProject.id === target.id) {
-          setSelectedProject((p: any) => ({ ...p, image: localUrl }));
-        }
-        setEditingProject((p: any) => p && p.id === target.id ? { ...p, image: localUrl } : p);
-        // Optimistic update for the projects list
-        setProjects((prev) => prev.map(p => p.id === target.id ? { ...p, image: localUrl } : p));
-      } else {
-        setExperience((prev) => prev.map(e => e.id === target.id ? { ...e, logo: localUrl } : e));
-      }
+      // Compress the image before converting to Base64 to prevent exceeding Firestore 1MB document limit
+      const compressImage = (fileBlob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.src = URL.createObjectURL(fileBlob);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1000;
+            const MAX_HEIGHT = 1000;
+            let width = img.width;
+            let height = img.height;
 
-      const fileExtension = 'jpg';
-      const folder = target.type === 'project' ? 'projects' : 'logos';
-      const fileName = `${folder}/${target.id}/${Date.now()}.${fileExtension}`;
-      const storageRef = ref(storage, fileName);
-      
-      console.log(`📡 Uploading to: ${fileName}...`);
-      const uploadTask = uploadBytesResumable(storageRef, blob, {
-        contentType: 'image/jpeg',
-        customMetadata: {
-          'uploadedBy': auth.currentUser?.uid || 'anonymous',
-          'originalId': target.id
-        }
-      });
-
-      // Handle progress and completion with retries
-      const MAX_RETRIES = 3;
-      let attempt = 0;
-      let uploadResult = null;
-
-      while (attempt < MAX_RETRIES) {
-        try {
-          uploadResult = await new Promise<any>((resolve, reject) => {
-            uploadTask.on('state_changed', 
-              (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                console.log(`📊 Upload progress: ${progress.toFixed(2)}%`);
-              }, 
-              (error) => {
-                reject(error);
-              }, 
-              async () => {
-                resolve(uploadTask.snapshot);
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
               }
-            );
-          });
-          break; // Success
-        } catch (error: any) {
-          attempt++;
-          console.error(`🔥 Storage Upload Attempt ${attempt} failed:`, error);
-          if (attempt >= MAX_RETRIES) throw error;
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
-        }
-      }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.8));
+            } else {
+              reject(new Error("Canvas context is null"));
+            }
+          };
+          img.onerror = reject;
+        });
+      };
 
-
-      const downloadURL = await getDownloadURL(uploadResult.ref);
+      const base64Url = await compressImage(blob);
       
       const docRef = doc(db, target.type === 'project' ? 'projects' : 'experience', target.id);
-      const updateData = target.type === 'project' ? { image: downloadURL } : { logo: downloadURL };
+      const updateData = target.type === 'project' ? { image: base64Url } : { logo: base64Url };
       await updateDoc(docRef, updateData);
 
-      // Update with final URL
+      // Update with final URL (base64)
       if (target.type === 'project') {
         if (selectedProject && selectedProject.id === target.id) {
-          setSelectedProject((p: any) => ({ ...p, image: downloadURL }));
+          setSelectedProject((p: any) => ({ ...p, image: base64Url }));
         }
-        setEditingProject((p: any) => p && p.id === target.id ? { ...p, image: downloadURL } : p);
-        setProjects((prev) => prev.map(p => p.id === target.id ? { ...p, image: downloadURL } : p));
+        setEditingProject((p: any) => p && p.id === target.id ? { ...p, image: base64Url } : p);
+        setProjects((prev) => prev.map(p => p.id === target.id ? { ...p, image: base64Url } : p));
       } else {
-        setExperience((prev) => prev.map(e => e.id === target.id ? { ...e, logo: downloadURL } : e));
+        setExperience((prev) => prev.map(e => e.id === target.id ? { ...e, logo: base64Url } : e));
       }
       
       alert(`${target.type === 'project' ? 'Project cover' : 'Company logo'} updated and saved successfully!`);
@@ -677,7 +657,7 @@ export default function App() {
       setUploadingForId(null);
       uploadTargetRef.current = null;
     }
-  }, [selectedProject]);
+  };
 
   const handleExperienceLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -923,6 +903,18 @@ export default function App() {
             </span>
             <div className="h-4 w-px bg-white/20" />
             
+            <button 
+              onClick={seedDatabase} 
+              disabled={isSeeding}
+              className={`text-[10px] font-bold uppercase transition-all px-3 py-1 rounded-md flex items-center gap-2 ${
+                projects.length === 0 
+                ? 'bg-amber-400 text-slate-900 animate-pulse shadow-[0_0_15px_rgba(251,191,36,0.5)]' 
+                : 'bg-white/20 hover:bg-white/30'
+              }`}
+            >
+              <Database size={12} /> {isSeeding ? 'Syncing...' : projects.length === 0 ? 'Sync Required (Database Empty)' : 'Sync Defaults'}
+            </button>
+
             {!isEditMode ? (
               <button 
                 onClick={() => setIsEditMode(true)}
@@ -953,17 +945,6 @@ export default function App() {
             )}
           </div>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={seedDatabase} 
-              disabled={isSeeding}
-              className={`text-[10px] font-bold uppercase transition-all px-3 py-1 rounded-md flex items-center gap-2 ${
-                projects.length === 0 
-                ? 'bg-amber-400 text-slate-900 animate-pulse shadow-[0_0_15px_rgba(251,191,36,0.5)]' 
-                : 'bg-white/10 hover:bg-white/20'
-              }`}
-            >
-              <Database size={12} /> {isSeeding ? 'Syncing...' : projects.length === 0 ? 'Sync Required (Database Empty)' : 'Sync Defaults'}
-            </button>
             <button 
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-all flex items-center gap-2 text-[10px] uppercase font-bold"
@@ -1394,10 +1375,8 @@ export default function App() {
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const newUrl = window.prompt("Enter new Image URL:", project.image);
-                                      if (newUrl && newUrl !== project.image) {
-                                        updateDoc(doc(db, 'projects', project.id), { image: newUrl });
-                                      }
+                                      setShowUrlPromptId(project.id);
+                                      setUrlPromptValue(project.image);
                                     }}
                                     className="p-2 bg-slate-800/90 backdrop-blur-md text-white rounded-xl shadow-lg hover:bg-slate-900 transition-all hover:scale-110 active:scale-95"
                                     title="Change Link"
@@ -1882,10 +1861,8 @@ export default function App() {
                       <button 
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const newUrl = window.prompt("Enter new Image URL:", currentProject.image);
-                          if (newUrl && newUrl !== currentProject.image) {
-                            setEditingProject((prev: any) => ({ ...prev, image: newUrl }));
-                          }
+                          setShowUrlPromptId(currentProject.id);
+                          setUrlPromptValue(currentProject.image);
                         }}
                         className="bg-slate-900/80 backdrop-blur-md text-white px-6 py-2 rounded-xl flex items-center gap-2 shadow-2xl scale-90 group-hover:scale-100 transition-all hover:bg-slate-900 active:scale-95 text-xs"
                       >
@@ -2270,6 +2247,70 @@ export default function App() {
         )}
       </AnimatePresence>
 
+
+      {/* URL Input Modal */}
+      <AnimatePresence>
+        {showUrlPromptId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-800"
+            >
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <Link size={18} className="text-indigo-500" />
+                Change Image URL
+              </h3>
+              <input
+                type="url"
+                value={urlPromptValue}
+                onChange={(e) => setUrlPromptValue(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl mb-6 text-slate-900 dark:text-white focus:outline-none focus:ring-2 ring-indigo-500"
+                autoFocus
+              />
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  onClick={() => setShowUrlPromptId(null)}
+                  className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const id = showUrlPromptId;
+                    const val = urlPromptValue.trim();
+                    setShowUrlPromptId(null);
+                    
+                    if (val) {
+                      if (selectedProject && selectedProject.id === id) {
+                        setEditingProject((prev: any) => ({ ...prev, image: val }));
+                      } else {
+                        // Optimistic update
+                        setProjects((prev) => prev.map(p => p.id === id ? { ...p, image: val } : p));
+                        try {
+                          await updateDoc(doc(db, 'projects', id), { image: val });
+                        } catch (err) {
+                          console.error('Failed to update URL in Firestore', err);
+                        }
+                      }
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                >
+                  Save URL
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Full Screen Image Preview Modal */}
       <AnimatePresence>
