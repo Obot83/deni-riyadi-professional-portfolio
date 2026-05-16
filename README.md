@@ -1,20 +1,41 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Aplikasi Web Portofolio
 
-# Run and deploy your AI Studio app
+Aplikasi web portofolio ini dibangun menggunakan React, TypeScript, Tailwind CSS, dan dihubungkan dengan layanan Firebase (Database dan Storage).
 
-This contains everything you need to run your app locally.
+## Cara Menjalankan Website ini di Local (Laptop/PC Anda)
 
-View your app in AI Studio: https://ai.studio/apps/af16c8be-789b-4671-9ada-f7b4e70d03ae
+Agar dapat menjalankan dan memodifikasi aplikasi portofolio ini di komputer lokal Anda, ikuti langkah-langkah di bawah ini:
 
-## Run Locally
+### 1. Persiapan (Prerequisites)
+Pastikan Anda sudah menginstal program berikut di komputer Anda:
+- **Node.js** (Versi 18 ke atas disarankan). Anda dapat mengunduhnya di [https://nodejs.org/](https://nodejs.org/).
+- Code editor seperti **Visual Studio Code (VS Code)**.
 
-**Prerequisites:**  Node.js
+### 2. Buka Folder Project
+- Jika Anda mendownload kode dalam bentuk `ZIP` file, pastikan untuk mengekstrak (unzip) foldernya terlebih dahulu.
+- Buka folder aplikasi tersebut di VS Code.
+- Buka Terminal di VS Code melalui menu `Terminal > New Terminal`.
 
+### 3. Install Dependensi (Library)
+Di dalam terminal (pastikan lokasinya sama dengan lokasi file `package.json`), ketikkan perintah berikut untuk mengunduh semua pustaka (library) yang dibutuhkan aplikasi:
+```bash
+npm install
+```
+Tunggu hingga proses instalasi library selesai.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 4. Konfigurasi Firebase
+Karena aplikasi ini terhubung ke Firebase, pastikan konfigurasi Firebase tetap tersedia di project (seperti file `firebase-applet-config.json`). Jika kode sudah berjalan di environment ini, konfigurasi tersebut seharusnya sudah tersimpan dalam proyek saat Anda mendownloadnya.
+
+### 5. Menjalankan Aplikasi
+Setelah berhasil menginstal seluruh library, Anda bisa menjalankan server web lokal untuk aplikasi portofolio ini dengan perintah:
+```bash
+npm run dev
+```
+
+### 6. Buka di Browser
+Jika perintah sebelumnya berhasil dijalankan, informasi server local akan muncul di terminal (biasanya berada di port 3000).
+- Buka web browser kesayangan Anda (misal Google Chrome atau Safari)
+- Pergi ke alamat URL berikut:
+  **http://localhost:3000**
+
+Sekarang aplikasi portofolio akan muncul dan berjalan secara interaktif di laptop Anda! Setiap perubahan file kode yang Anda simpan akan secara instan mengubah tampilan pada browser tersebut.
