@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Portfolio Project",
+      "description": "A featured project in the portfolio",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "role": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "techStack": { "type": "string" },
+        "responsibilities": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "iconName": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["title", "description", "role"]
+    },
+    "Experience": {
+      "title": "Work Experience",
+      "description": "Professional history entry",
+      "type": "object",
+      "properties": {
+        "company": { "type": "string" },
+        "logo": { "type": "string" },
+        "role": { "type": "string" },
+        "period": { "type": "string" },
+        "highlights": { "type": "array", "items": { "type": "string" } },
+        "order": { "type": "number" }
+      },
+      "required": ["company", "role", "period"]
+    },
+    "Profile": {
+      "title": "User Profile",
+      "description": "General information for the CV",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "summary": { "type": "string" },
+        "location": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "certifications": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "firestore": {
+    "/projects": { "schema": "Project", "description": "Collection of featured projects" },
+    "/experience": { "schema": "Experience", "description": "Collection of work experience" },
+    "/settings/profile": { "schema": "Profile", "description": "Global profile settings" }
+  }
+}
