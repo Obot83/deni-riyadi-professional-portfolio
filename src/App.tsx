@@ -618,23 +618,36 @@ export default function App() {
         }
       });
 
-      // Handle progress and completion
-      const uploadResult = await new Promise<any>((resolve, reject) => {
-        uploadTask.on('state_changed', 
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            console.log(`📊 Upload progress: ${progress.toFixed(2)}%`);
-          }, 
-          (error) => {
-            console.error("🔥 Storage Upload Task Error:", error);
-            reject(error);
-          }, 
-          async () => {
-            console.log("✅ Storage Upload Task Completed");
-            resolve(uploadTask.snapshot);
-          }
-        );
-      });
+      // Handle progress and completion with retries
+      const MAX_RETRIES = 3;
+      let attempt = 0;
+      let uploadResult = null;
+
+      while (attempt < MAX_RETRIES) {
+        try {
+          uploadResult = await new Promise<any>((resolve, reject) => {
+            uploadTask.on('state_changed', 
+              (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                console.log(`📊 Upload progress: ${progress.toFixed(2)}%`);
+              }, 
+              (error) => {
+                reject(error);
+              }, 
+              async () => {
+                resolve(uploadTask.snapshot);
+              }
+            );
+          });
+          break; // Success
+        } catch (error: any) {
+          attempt++;
+          console.error(`🔥 Storage Upload Attempt ${attempt} failed:`, error);
+          if (attempt >= MAX_RETRIES) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+        }
+      }
+
 
       const downloadURL = await getDownloadURL(uploadResult.ref);
       
@@ -716,9 +729,24 @@ export default function App() {
         contentType: 'application/pdf'
       });
 
-      const uploadResult = await new Promise<any>((resolve, reject) => {
-        uploadTask.on('state_changed', null, (error) => reject(error), async () => resolve(uploadTask.snapshot));
-      });
+      // Handle upload with retries
+      const MAX_RETRIES = 3;
+      let attempt = 0;
+      let uploadResult = null;
+
+      while (attempt < MAX_RETRIES) {
+        try {
+          uploadResult = await new Promise<any>((resolve, reject) => {
+            uploadTask.on('state_changed', null, (error) => reject(error), async () => resolve(uploadTask.snapshot));
+          });
+          break; // Success
+        } catch (error: any) {
+          attempt++;
+          console.error(`🔥 CV Upload Attempt ${attempt} failed:`, error);
+          if (attempt >= MAX_RETRIES) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+        }
+      }
 
       const downloadURL = await getDownloadURL(uploadResult.ref);
       

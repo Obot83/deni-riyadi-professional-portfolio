@@ -8,10 +8,6 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const storage = getStorage(app);
 
-// Increase retry times for better reliability on flaky connections
-storage.maxOperationRetryTime = 300000; // 5 minutes
-storage.maxUploadRetryTime = 300000; // 5 minutes
-
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
